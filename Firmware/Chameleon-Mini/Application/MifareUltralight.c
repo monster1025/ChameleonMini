@@ -280,6 +280,7 @@ static uint8_t AppWritePage(uint8_t PageAddress, uint8_t *const Buffer) {
 
 /* Handles processing of MF commands */
 static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
+    uint8_t lockbytes[BYTES_PER_READ];
     uint8_t Cmd = Buffer[0];
 
     /* Handle the compatibility write command */
@@ -360,7 +361,7 @@ static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
             }
 
             /* READ page 2 & 3 for LockBytes and fuses */
-            MemoryReadBlock(&lockbytes, PAGE_LOCK_BYTES * BYTES_PER_PAGE, BYTES_PER_READ);
+            MemoryReadBlock(&lockbytes, PAGE_LOCK_BYTES * MIFARE_ULTRALIGHT_PAGE_SIZE, BYTES_PER_READ);
             /* test if lockbytes are not reset */
             if (PageAddress == PAGE_LOCK_BYTES) {
                 /* test if block 4-9 lockbits are writable if not aspect the same bits*/
@@ -384,7 +385,9 @@ static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
                 }
                 /* ToDo: should only write after a next WUPA or REQA statement */
                 /* Only write OTP structure */
-                MemoryWriteBlock(&Buffer[4], (PageAddress * BYTES_PER_PAGE) + 2, 2);
+                if (!ActiveConfiguration.ReadOnly) {
+                    MemoryWriteBlock(&Buffer[4], (PageAddress * MIFARE_ULTRALIGHT_PAGE_SIZE) + 2, 2);
+                }
                 Buffer[0] = ACK_VALUE;
                 return ACK_FRAME_SIZE;
             }
@@ -399,7 +402,9 @@ static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
                 Buffer[3] = Buffer[3] | lockbytes[5];
                 Buffer[4] = Buffer[4] | lockbytes[6];
                 Buffer[5] = Buffer[5] | lockbytes[7];
-                MemoryWriteBlock(&Buffer[2], PageAddress * BYTES_PER_PAGE, BYTES_PER_WRITE);
+                if (!ActiveConfiguration.ReadOnly) {
+                    MemoryWriteBlock(&Buffer[2], PageAddress * MIFARE_ULTRALIGHT_PAGE_SIZE, BYTES_PER_WRITE);
+                }
                 Buffer[0] = ACK_VALUE;
                 return ACK_FRAME_SIZE;
             }
