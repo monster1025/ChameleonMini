@@ -40,10 +40,7 @@ static const MapEntryType PROGMEM ConfigurationMap[] = {
     { .Id = CONFIG_MF_CLASSIC_4K_7B, 	.Text = "MF_CLASSIC_4K_7B" },
 #endif
 #ifdef CONFIG_MF_DETECTION_SUPPORT
-    { .Id = CONFIG_MF_DETECTION,   .Text = "MF_DETECTION_1K" },
-#endif
-#ifdef CONFIG_MF_DETECTION_4K_SUPPORT
-    { .Id = CONFIG_MF_DETECTION_4K,    .Text = "MF_DETECTION_4K" },
+    { .Id = CONFIG_MF_DETECTION,   .Text = "MF_DETECTION" },
 #endif
 #ifdef CONFIG_ISO14443A_SNIFF_SUPPORT
     { .Id = CONFIG_ISO14443A_SNIFF,	.Text = "ISO14443A_SNIFF" },

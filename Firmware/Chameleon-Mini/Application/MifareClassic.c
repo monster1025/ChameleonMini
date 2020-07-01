@@ -5,7 +5,6 @@
  *      Author: skuser
  */
 
-#include "System.h"
 #include "MifareClassic.h"
 
 #include "ISO14443-3A.h"
@@ -15,15 +14,15 @@
 #include "../Random.h"
 
 #define MFCLASSIC_MINI_4B_ATQA_VALUE    0x0004
-#define MFCLASSIC_1K_ATQA_VALUE     0x0004
-#define MFCLASSIC_1K_7B_ATQA_VALUE  0x0044
-#define MFCLASSIC_4K_ATQA_VALUE     0x0002
-#define MFCLASSIC_4K_7B_ATQA_VALUE  0x0042
+#define MFCLASSIC_1K_ATQA_VALUE         0x0004
+#define MFCLASSIC_1K_7B_ATQA_VALUE      0x0044
+#define MFCLASSIC_4K_ATQA_VALUE         0x0002
+#define MFCLASSIC_4K_7B_ATQA_VALUE      0x0042
 
 #define MFCLASSIC_MINI_4B_SAK_VALUE    0x09
-#define MFCLASSIC_1K_SAK_VALUE      0x08
-#define MFCLASSIC_4K_SAK_VALUE      0x18
-#define SAK_UID_NOT_FINISHED        0x04
+#define MFCLASSIC_1K_SAK_VALUE         0x08
+#define MFCLASSIC_4K_SAK_VALUE         0x18
+#define SAK_UID_NOT_FINISHED           0x04
 
 #define MEM_UID_CL1_ADDRESS         0x00
 #define MEM_UID_CL1_SIZE            4
@@ -114,19 +113,19 @@ C1 C2 C3        read  write  read  write  read  write
 
 /*
 Access conditions for data blocks
-Access bits Access condition for                Application
-C1 C2 C3    read    write   increment   decrement,
+Access bits Access condition for                 Application
+C1 C2 C3     read     write     increment     decrement,
                                                 transfer,
                                                 restore
 
-0 0 0       key A|B key A|B key A|B     key A|B     transport configuration
-0 1 0       key A|B never   never       never       read/write block
-1 0 0       key A|B key B   never       never       read/write block
-1 1 0       key A|B key B   key B       key A|B     value block
-0 0 1       key A|B never   never       key A|B     value block
-0 1 1       key B   key B   never       never       read/write block
-1 0 1       key B   never   never       never       read/write block
-1 1 1       never   never   never       never       read/write block
+0 0 0         key A|B key A|B key A|B     key A|B     transport configuration
+0 1 0         key A|B never     never         never         read/write block
+1 0 0         key A|B key B     never         never         read/write block
+1 1 0         key A|B key B     key B         key A|B     value block
+0 0 1         key A|B never     never         key A|B     value block
+0 1 1         key B     key B     never         never         read/write block
+1 0 1         key B     never     never         never         read/write block
+1 1 1         never     never     never         never         read/write block
 
 */
 #define ACC_BLOCK_READ      0x01
@@ -140,42 +139,42 @@ C1 C2 C3    read    write   increment   decrement,
 /* Decoding table for Access conditions of a data block */
 static const uint8_t abBlockAccessConditions[8][2] = {
     /*C1C2C3 */
-    /* 0 0 0 R:key A|B W: key A|B I:key A|B D:key A|B   transport configuration */
+    /* 0 0 0 R:key A|B W: key A|B I:key A|B D:key A|B     transport configuration */
     {
         /* Access with Key A */
         ACC_BLOCK_READ | ACC_BLOCK_WRITE | ACC_BLOCK_INCREMENT | ACC_BLOCK_DECREMENT,
         /* Access with Key B */
         ACC_BLOCK_READ | ACC_BLOCK_WRITE | ACC_BLOCK_INCREMENT | ACC_BLOCK_DECREMENT
     },
-    /* 1 0 0 R:key A|B W:key B I:never D:never  read/write block */
+    /* 1 0 0 R:key A|B W:key B I:never D:never     read/write block */
     {
         /* Access with Key A */
         ACC_BLOCK_READ,
         /* Access with Key B */
         ACC_BLOCK_READ | ACC_BLOCK_WRITE
     },
-    /* 0 1 0 R:key A|B W:never I:never D:never  read/write block */
+    /* 0 1 0 R:key A|B W:never I:never D:never     read/write block */
     {
         /* Access with Key A */
         ACC_BLOCK_READ,
         /* Access with Key B */
         ACC_BLOCK_READ
     },
-    /* 1 1 0 R:key A|B W:key B I:key B D:key A|B    value block */
+    /* 1 1 0 R:key A|B W:key B I:key B D:key A|B     value block */
     {
         /* Access with Key A */
         ACC_BLOCK_READ  |  ACC_BLOCK_DECREMENT,
         /* Access with Key B */
         ACC_BLOCK_READ | ACC_BLOCK_WRITE | ACC_BLOCK_INCREMENT | ACC_BLOCK_DECREMENT
     },
-    /* 0 0 1 R:key A|B W:never I:never D:key A|B    value block */
+    /* 0 0 1 R:key A|B W:never I:never D:key A|B     value block */
     {
         /* Access with Key A */
         ACC_BLOCK_READ  |  ACC_BLOCK_DECREMENT,
         /* Access with Key B */
         ACC_BLOCK_READ  |  ACC_BLOCK_DECREMENT
     },
-    /* 1 0 1 R:key B W:never I:never D:never    read/write block */
+    /* 1 0 1 R:key B W:never I:never D:never     read/write block */
     {
         /* Access with Key A */
         0,
@@ -200,7 +199,7 @@ static const uint8_t abBlockAccessConditions[8][2] = {
 };
 /* Decoding table for Access conditions of the sector trailor */
 static const uint8_t abTrailorAccessConditions[8][2] = {
-    /* 0  0  0 RdKA:never WrKA:key A  RdAcc:key A WrAcc:never  RdKB:key A WrKB:key A    Key B may be read[1] */
+    /* 0  0  0 RdKA:never WrKA:key A  RdAcc:key A WrAcc:never  RdKB:key A WrKB:key A      Key B may be read[1] */
     {
         /* Access with Key A */
         ACC_TRAILOR_WRITE_KEYA | ACC_TRAILOR_READ_ACC | ACC_TRAILOR_WRITE_ACC | ACC_TRAILOR_READ_KEYB | ACC_TRAILOR_WRITE_KEYB,
@@ -285,10 +284,9 @@ static uint8_t AccessAddress;
 static uint16_t CardATQAValue;
 static uint8_t CardSAKValue;
 static bool FromHalt = false;
-static bool DetectionMode = false;
-static uint8_t Key[6];
-static uint8_t Uid[4];
-static uint8_t CardNonce[8];
+uint8_t Key[6];
+uint8_t Uid[4];
+uint8_t CardNonce[8];
 
 #define BYTE_SWAP(x) (((uint8_t)(x)>>4)|((uint8_t)(x)<<4))
 #define NO_ACCESS 0x07
@@ -381,92 +379,6 @@ INLINE void ValueToBlock(uint8_t *Block, uint32_t Value) {
     Block[11] = Block[3];
 }
 
-extern uint8_t bUidMode;                // Magic card mode switch
-
-#define FRAM_DETECTION_START_ADDR    0x7000
-#define FRAM_DETECTION_DATA_ADDR    0x7002
-#define FRAM_DETECTION_DATA_SIZE    0x0FF8
-
-static uint16_t DetectionLogPtr = FRAM_DETECTION_DATA_ADDR;
-static uint8_t EEMEM LogDetectionValid = false;
-
-static void DetectionLogToFlash(uint8_t Entry, const void *Data, uint8_t Length) {
-    if (!DetectionMode)
-        return;
-
-    uint8_t bLogHead[4];
-    uint16_t SysTick = SystemGetSysTick();
-
-    uint16_t FRAM_Free = FRAM_DETECTION_DATA_SIZE - (DetectionLogPtr - FRAM_DETECTION_START_ADDR);
-
-    // Prevent overflow, discard
-    if ((Length + 4) >= FRAM_Free) {
-        // Light up LED4-6-8 to notify
-        PORTA.DIRSET = PIN0_bm;
-        PORTE.DIRSET = PIN1_bm | PIN0_bm;
-
-        PORTA.OUTCLR = PIN0_bm;
-        PORTE.OUTCLR = PIN1_bm;
-        PORTE.OUTCLR = PIN0_bm;
-        return;
-    }
-
-    bLogHead[0] = Entry;
-    bLogHead[1] = Length;
-    bLogHead[2] = (uint8_t)(SysTick >> 8);
-    bLogHead[3] = (uint8_t)(SysTick >> 0);
-    MemoryWriteBlock(bLogHead, DetectionLogPtr, 4);
-    DetectionLogPtr += 4;
-
-    MemoryWriteBlock(Data, DetectionLogPtr, Length);
-    DetectionLogPtr += Length;
-
-    MemoryWriteBlock(&DetectionLogPtr, FRAM_DETECTION_START_ADDR, 2);
-}
-
-void DetectionLogClear(void) {
-    DetectionLogPtr = FRAM_DETECTION_DATA_ADDR;
-    MemoryWriteBlock(&DetectionLogPtr, FRAM_DETECTION_START_ADDR, 2);
-}
-
-void DetectionInit(void) {
-    uint8_t result;
-    ReadEEPBlock((uint16_t) &LogDetectionValid, &result, 1);
-    if (result == 0x5A) {
-        MemoryReadBlock(&DetectionLogPtr, FRAM_DETECTION_START_ADDR, 2);
-    } else {
-        DetectionLogClear();
-        result = 0x5A;
-        WriteEEPBlock((uint16_t) &LogDetectionValid, &result, 1);
-    }
-}
-
-// Download log
-bool RfLogMemLoadBlock(void *Buffer, uint32_t BlockAddress, uint16_t ByteCount) {
-    //    位置超出尾部了，结束
-    if (BlockAddress < (DetectionLogPtr - FRAM_DETECTION_START_ADDR)) {
-        MemoryReadBlock(Buffer, BlockAddress + FRAM_DETECTION_START_ADDR, ByteCount);
-        if (0 == BlockAddress)
-            ((uint8_t *)Buffer)[1] -= FRAM_DETECTION_START_ADDR >> 8;
-
-        return true;
-    } else {
-        return false;
-    }
-}
-
-// Download detection log
-CommandStatusIdType CommandGetDetection(char *OutMessage) {
-    XModemSend(RfLogMemLoadBlock);
-    return COMMAND_INFO_XMODEM_WAIT_ID;
-}
-
-// Clear detection log
-CommandStatusIdType CommandSetDetection(char *OutMessage, const char *InParam) {
-    DetectionLogClear();
-    return COMMAND_INFO_OK_ID;
-}
-
 void MifareClassicAppInitMini4B(void) {
     State = STATE_IDLE;
     CardATQAValue = MFCLASSIC_MINI_4B_ATQA_VALUE;
@@ -503,55 +415,6 @@ void MifareClassicAppInit4K7B(void) {
     FromHalt = false;
 }
 
-// 1K mode is used by default
-void MifareDetectionInit1K(void) {
-    State = STATE_IDLE;
-    CardATQAValue = MFCLASSIC_1K_ATQA_VALUE;
-    CardSAKValue = MFCLASSIC_1K_SAK_VALUE;
-    FromHalt = false;
-    DetectionMode = true;
-
-    DetectionLogToFlash(LOG_INFO_SYSTEM_BOOT, NULL, 0);
-
-    if (GlobalSettings.ActiveSettingPtr->bSakMode) {
-        MemoryReadBlock(&CardSAKValue, 5, 1);
-        MemoryReadBlock(&CardATQAValue, 6, 2);
-    }
-}
-
-void MifareDetectionInit1K7B(void) {
-    State = STATE_IDLE;
-    CardATQAValue = MFCLASSIC_1K_7B_ATQA_VALUE;
-    CardSAKValue = MFCLASSIC_1K_SAK_VALUE;
-    FromHalt = false;
-    DetectionMode = true;
-
-    DetectionLogToFlash(LOG_INFO_SYSTEM_BOOT, NULL, 0);
-}
-
-void MifareDetectionInit4K(void) {
-    State = STATE_IDLE;
-    CardATQAValue = MFCLASSIC_4K_ATQA_VALUE;
-    CardSAKValue = MFCLASSIC_4K_SAK_VALUE;
-    FromHalt = false;
-
-    DetectionLogToFlash(LOG_INFO_SYSTEM_BOOT, NULL, 0);
-
-    if (GlobalSettings.ActiveSettingPtr->bSakMode) {
-        MemoryReadBlock(&CardSAKValue, 5, 1);
-        MemoryReadBlock(&CardATQAValue, 6, 2);
-    }
-}
-
-void MifareDetectionInit4K7B(void) {
-    State = STATE_IDLE;
-    CardATQAValue = MFCLASSIC_4K_7B_ATQA_VALUE;
-    CardSAKValue = MFCLASSIC_4K_SAK_VALUE;
-    FromHalt = false;
-
-    DetectionLogToFlash(LOG_INFO_SYSTEM_BOOT, NULL, 0);
-}
-
 void MifareClassicAppReset(void) {
     State = STATE_IDLE;
 }
@@ -582,13 +445,16 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
                 State = STATE_READY1;
                 return BitCount;
             }
+#ifdef SUPPORT_MF_CLASSIC_MAGIC_MODE
             else if (Buffer[0] == CMD_CHINESE_UNLOCK && bUidMode) {
                 State = STATE_CHINESE_IDLE;
                 Buffer[0] = ACK_VALUE;
                 return ACK_NAK_FRAME_SIZE;
             }
+#endif
             break;
 
+#ifdef SUPPORT_MF_CLASSIC_MAGIC_MODE
         case STATE_CHINESE_IDLE:
             /* Support special china commands that dont require authentication. */
             if (Buffer[0] == CMD_CHINESE_UNLOCK_RW) {
@@ -661,6 +527,7 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
             State = STATE_CHINESE_IDLE;
 
             return ACK_NAK_FRAME_SIZE;
+#endif
 
         case STATE_READY1:
             if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, FromHalt)) {
@@ -714,6 +581,10 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
             if (ISO14443AWakeUp(Buffer, &BitCount, CardATQAValue, FromHalt)) {
                 State = FromHalt ? STATE_HALT : STATE_IDLE;
                 return ISO14443A_APP_NO_RESPONSE;
+            } else if (Buffer[0] == CMD_CHINESE_UNLOCK && bUidMode) {
+                State = STATE_CHINESE_IDLE;
+                Buffer[0] = ACK_VALUE;
+                return ACK_NAK_FRAME_SIZE;
             } else if (Buffer[0] == CMD_HALT) {
                 /* Halts the tag. According to the ISO14443, the second
                 * byte is supposed to be 0. */
@@ -760,6 +631,7 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
                     AccessAddress = CurrentAddress;
                     //}
 
+
                     /* Generate a random nonce and read UID and key from memory */
                     RandomGetBuffer(CardNonce, sizeof(CardNonce));
                     if (ActiveConfiguration.UidSize == 7)
@@ -795,6 +667,7 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
             } else if ((Buffer[0] == CMD_SIG_READ) &&
                        (Buffer[1] == 0xe0) &&
                        (Buffer[2] == 0xb4)) {
+                uint8_t Key[6];
                 /* check if Originality check signature data available */
                 /* Signature data is stored in (hidden) blocks 68..71 (0x44..0x47) */
                 /* Signature data is read with key B, check if present */
@@ -835,10 +708,10 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
                     CardResponse[i] = ReaderResponse[i];
 
                 Crypto1PRNG(CardResponse, 32);
+
                 /* Setup crypto1 cipher. Discard in-place encrypted CardNonce. */
                 Crypto1Setup(Key, Uid, CardNonce);
             }
-
             /* Reader delivers an encrypted nonce. We use it
             * to setup the crypto1 LFSR in nonlinear feedback mode.
             * Furthermore it delivers an encrypted answer. Decrypt and check it */
@@ -1008,6 +881,9 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
                     uint16_t KeyOffset = (Buffer[0] == CMD_AUTH_A ? MEM_KEY_A_OFFSET : MEM_KEY_B_OFFSET);
                     uint16_t AccOffset = MEM_KEY_A_OFFSET + MEM_KEY_SIZE;
                     uint16_t SectorStartAddress;
+                    uint8_t Key[6];
+                    uint8_t Uid[4];
+                    uint8_t CardNonce[8];
 
                     /* Fix for MFClassic 4k cards */
                     if (Buffer[1] >= 128) {
