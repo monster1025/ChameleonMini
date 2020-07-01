@@ -86,6 +86,9 @@
 
 #define BYTES_PER_COMPAT_WRITE  16
 
+#define PAGE_LOCK_BYTES       0x02
+#define PAGE_OTP_FUSE         0x03
+
 #define VERSION_INFO_LENGTH     8
 #define SIGNATURE_LENGTH        32
 
@@ -277,6 +280,7 @@ static uint8_t AppWritePage(uint8_t PageAddress, uint8_t *const Buffer) {
 
 /* Handles processing of MF commands */
 static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
+    uint8_t lockbytes[BYTES_PER_READ];
     uint8_t Cmd = Buffer[0];
 
     /* Handle the compatibility write command */
@@ -355,9 +359,70 @@ static uint16_t AppProcess(uint8_t *const Buffer, uint16_t ByteCount) {
                 Buffer[0] = NAK_AUTH_REQUIRED;
                 return NAK_FRAME_SIZE;
             }
-            AppWritePage(PageAddress, &Buffer[2]);
-            Buffer[0] = ACK_VALUE;
-            return ACK_FRAME_SIZE;
+
+            /* READ page 2 & 3 for LockBytes and fuses */
+            MemoryReadBlock(&lockbytes, PAGE_LOCK_BYTES * MIFARE_ULTRALIGHT_PAGE_SIZE, BYTES_PER_READ);
+            /* test if lockbytes are not reset */
+            if (PageAddress == PAGE_LOCK_BYTES) {
+                /* test if block 4-9 lockbits are writable if not aspect the same bits*/
+                if (((lockbytes[2] & 0x02) == 0x02)
+                        && ((Buffer[4] & 0xF0) ^ (lockbytes[2] & 0xF0)) == 0
+                        && ((Buffer[5] & 0x03) ^ (lockbytes[3] & 0x03)) == 0) {
+                    Buffer[0] = NAK_INVALID_ARG;
+                    return NAK_FRAME_SIZE;
+                }
+                /* test if block 10-15 lockbits are writable if not aspect the same bits*/
+                if (((lockbytes[2] & 0x04) == 0x04)
+                        && ((Buffer[5] & 0xFC) ^ (lockbytes[3] & 0xFC)) == 0) {
+                    Buffer[0] = NAK_INVALID_ARG;
+                    return NAK_FRAME_SIZE;
+                }
+                /* test if no lockbits are reset to 0 */
+                if (((Buffer[4] ^ lockbytes[2]) & lockbytes[2]) != 0
+                        || ((Buffer[5] ^ lockbytes[3]) & lockbytes[3]) != 0) {
+                    Buffer[0] = NAK_INVALID_ARG;
+                    return NAK_FRAME_SIZE;
+                }
+                /* ToDo: should only write after a next WUPA or REQA statement */
+                /* Only write OTP structure */
+                if (!ActiveConfiguration.ReadOnly) {
+                    MemoryWriteBlock(&Buffer[4], (PageAddress * MIFARE_ULTRALIGHT_PAGE_SIZE) + 2, 2);
+                }
+                Buffer[0] = ACK_VALUE;
+                return ACK_FRAME_SIZE;
+            }
+            if (PageAddress == PAGE_OTP_FUSE) {
+                /* test if no Fuse bits are locked */
+                if ((lockbytes[2] & 1) == 1) {
+                    Buffer[0] = NAK_INVALID_ARG;
+                    return NAK_FRAME_SIZE;
+                }
+                /*  OR the bytes to fuse to 1*/
+                Buffer[2] = Buffer[2] | lockbytes[4];
+                Buffer[3] = Buffer[3] | lockbytes[5];
+                Buffer[4] = Buffer[4] | lockbytes[6];
+                Buffer[5] = Buffer[5] | lockbytes[7];
+                if (!ActiveConfiguration.ReadOnly) {
+                    MemoryWriteBlock(&Buffer[2], PageAddress * MIFARE_ULTRALIGHT_PAGE_SIZE, BYTES_PER_WRITE);
+                }
+                Buffer[0] = ACK_VALUE;
+                return ACK_FRAME_SIZE;
+            }
+            /*  respect OTP */
+            if (((((int)0x0001 << PageAddress)  & ((int)lockbytes[2] + ((int)lockbytes[3] << 8))) & 0xFFFF) == 0x0000) {
+                AppWritePage(PageAddress, &Buffer[2]);
+                Buffer[0] = ACK_VALUE;
+                return ACK_FRAME_SIZE;
+            } else {
+                Buffer[0] = NAK_INVALID_ARG;
+                Buffer[1] = (((int)lockbytes[2] + ((int)lockbytes[3] << 8)) & 0xFF00) >> 8;
+                Buffer[2] = (((int)lockbytes[2] + ((int)lockbytes[3] << 8)) & 0x00FF) >> 0;
+                Buffer[3] = (((int)0x0001 << PageAddress) & 0xFF00) >> 8;
+                Buffer[4] = (((int)0x0001 << PageAddress) & 0x00FF) >> 0;
+                Buffer[5] = (((int)0x0001 << PageAddress)  & ((int)lockbytes[2] + ((int)lockbytes[3] << 8)) & 0xFF00) >> 8;
+                Buffer[6] = (((int)0x0001 << PageAddress)  & ((int)lockbytes[2] + ((int)lockbytes[3] << 8)) & 0x00FF) >> 0;
+                return 7 * 8;
+            }
         }
 
         case CMD_COMPAT_WRITE: {
