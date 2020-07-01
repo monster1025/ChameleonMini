@@ -284,9 +284,10 @@ static uint8_t AccessAddress;
 static uint16_t CardATQAValue;
 static uint8_t CardSAKValue;
 static bool FromHalt = false;
-uint8_t Key[6];
-uint8_t Uid[4];
-uint8_t CardNonce[8];
+static uint8_t Key[6];
+static uint8_t Uid[4];
+static uint8_t CardNonce[8];
+extern uint8_t bUidMode;                // Magic card mode switch
 
 #define BYTE_SWAP(x) (((uint8_t)(x)>>4)|((uint8_t)(x)<<4))
 #define NO_ACCESS 0x07
