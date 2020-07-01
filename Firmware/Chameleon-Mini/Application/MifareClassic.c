@@ -829,20 +829,15 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
 
         case STATE_AUTHING:
         case STATE_AUTHING_NESTED:
-            /* Precalculate our response from the reader response */
-            for (uint8_t i = 0; i < sizeof(CardResponse); i++)
-                CardResponse[i] = ReaderResponse[i];
-
-            Crypto1PRNG(CardResponse, 32);
-
             if (State == STATE_AUTHING) {
+                /* Precalculate our response from the reader response */
+                for (uint8_t i = 0; i < sizeof(CardResponse); i++)
+                    CardResponse[i] = ReaderResponse[i];
+
+                Crypto1PRNG(CardResponse, 32);
                 /* Setup crypto1 cipher. Discard in-place encrypted CardNonce. */
                 Crypto1Setup(Key, Uid, CardNonce);
-            } else if (State == STATE_AUTHING_NESTED) {
-                /* Setup crypto1 cipher. */
-                Crypto1SetupNested(Key, Uid, CardNonce, false);
             }
-
 
             /* Reader delivers an encrypted nonce. We use it
             * to setup the crypto1 LFSR in nonlinear feedback mode.
@@ -1046,6 +1041,15 @@ uint16_t MifareClassicAppProcess(uint8_t *Buffer, uint16_t BitCount) {
                         ReaderResponse[i] = CardNonce[i];
 
                     Crypto1PRNG(ReaderResponse, 64);
+
+                    /* Precalculate our response from the reader response */
+                    for (uint8_t i = 0; i < sizeof(CardResponse); i++)
+                        CardResponse[i] = ReaderResponse[i];
+
+                    Crypto1PRNG(CardResponse, 32);
+
+                    /* Setup crypto1 cipher. */
+                    Crypto1SetupNested(Key, Uid, CardNonce, false);
 
                     /* Respond with the encrypted random card nonce and expect further authentication
                      * form the reader in the next frame. */
